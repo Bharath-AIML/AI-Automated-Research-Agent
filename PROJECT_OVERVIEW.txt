@@ -1,0 +1,725 @@
+================================================================================
+  AI RESEARCH ASSISTANT — PROJECT OVERVIEW
+  Multi-Agent Debate System for Automated Research Critique
+  CCP Final Year Project
+================================================================================
+Last Updated: 2026-03-27
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ TABLE OF CONTENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 1. Project Summary
+ 2. Tech Stack
+ 3. Project Structure (File Tree)
+ 4. File-by-File Explanation
+ 5. How to Run
+ 6. Core Functional Flow (Step-by-Step)
+ 7. Agent Architecture
+ 8. NLP Pipeline Details
+ 9. Sentence Classification
+10. Multi-Agent Debate Logic
+11. Scoring & Verdict System
+12. Streamlit UI Details
+13. Data Sources (APIs)
+14. Configuration (config.py)
+15. Viva Defence Tips
+16. Changelog
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 1. PROJECT SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The AI Research Assistant is an intelligent system that automates the academic
+peer-review process using a multi-agent architecture. Instead of simply
+summarising papers, it CRITIQUES them — finding strengths and weaknesses — just
+like a real peer reviewer would.
+
+Key Idea:
+  Traditional tools → summarise research papers
+  This system       → DEBATES whether a paper is good or bad, then gives a score
+
+How it works in one sentence:
+  The system fetches real research papers, classifies each sentence using NLP,
+  and then runs a Defender vs Critic debate — arbitrated by a Judge agent that
+  produces a final score and recommendation.
+
+Why this is impressive for CCP:
+  - Uses real external APIs (arXiv, Semantic Scholar)
+  - Implements multi-agent architecture (5 agents working together)
+  - Uses NLP (tokenisation, lemmatisation, classification)
+  - Produces explainable, structured output
+  - Has a professional Streamlit UI with charts
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 2. TECH STACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Category              Library/Tool              Purpose
+──────────────────    ──────────────────────    ──────────────────────────────
+Language              Python 3.x                Core programming language
+HTTP Requests         requests                  Calling arXiv and Semantic Scholar APIs
+Data Processing       numpy, pandas             Numerical operations, data handling
+NLP — Tokenisation    NLTK                      Word tokenizer, stopword removal, lemmatizer
+NLP — Parsing         spaCy                     Better sentence boundary detection (optional)
+Transformers          sentence-transformers     Semantic sentence embeddings (optional)
+ML Evaluation         scikit-learn              accuracy, precision, recall, F1 scores
+Frontend UI           Streamlit                 Web interface
+Visualisation         Plotly                    Interactive charts in the UI
+Data Source 1         arXiv API                 Free academic paper database (no key needed)
+Data Source 2         Semantic Scholar API      Academic search (free tier, no key needed)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 3. PROJECT STRUCTURE (FILE TREE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+AI Automated Research Assistant/
+│
+├── app.py                        ← Streamlit web UI (ENTRY POINT — run this)
+├── config.py                     ← All project-wide settings
+├── requirements.txt              ← All Python dependencies
+├── PROJECT_OVERVIEW.txt          ← THIS FILE — full project documentation
+│
+├── agents/                       ← All AI agent modules
+│   ├── __init__.py               ← Makes 'agents' a Python package
+│   ├── research_agent.py         ← Fetches papers from arXiv + Semantic Scholar
+│   ├── defender_agent.py         ← Generates strengths / supporting arguments
+│   ├── critic_agent.py           ← Generates weaknesses / critical arguments
+│   ├── judge_agent.py            ← Synthesises debate → final score + verdict
+│   └── controller.py             ← Orchestrates all agents in order
+│
+├── nlp/                          ← NLP processing modules
+│   ├── __init__.py               ← Makes 'nlp' a Python package
+│   ├── preprocessor.py           ← Cleans text, tokenises, lemmatises
+│   └── classifier.py             ← Classifies sentences into 4 categories
+│
+├── utils/                        ← Shared utility functions
+│   ├── __init__.py               ← Makes 'utils' a Python package
+│   └── helpers.py                ← JSON save/load, formatting, color mapping
+│
+├── data/                         ← Auto-created at runtime
+│   └── session_log.json          ← Saved query history (auto-generated)
+│
+└── models/                       ← Reserved for future saved ML models
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 4. FILE-BY-FILE EXPLANATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  config.py                                                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+Central configuration file. All adjustable parameters live here.
+  - API URLs for arXiv and Semantic Scholar
+  - MAX_RESULTS_PER_SOURCE: how many papers to fetch from each API
+  - SENTENCE_CATEGORIES: the 4 NLP labels used by the classifier
+  - DEFENDER_TOP_N, CRITIC_TOP_N: how many sentences each agent focuses on
+  - SENTENCE_TRANSFORMER_MODEL: which HuggingFace model to use
+  - APP_TITLE, APP_ICON: Streamlit UI display settings
+  - DATA_DIR, LOG_FILE: where session data is saved
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  agents/research_agent.py                                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+The Research Agent fetches academic papers.
+  - fetch_papers(query) → calls both APIs, returns list of paper dicts
+  - _fetch_arxiv()      → queries arXiv Atom XML API, parses XML
+  - _fetch_semantic_scholar() → queries Semantic Scholar JSON API
+  - _deduplicate()      → removes duplicate papers (same title)
+  
+Each paper dict contains:
+  { title, authors, abstract, year, source, url }
+
+arXiv uses a free XML-based API (Atom format). No API key required.
+Semantic Scholar uses a JSON REST API. Free tier works fine for demos.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  nlp/preprocessor.py                                                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+The Preprocessor cleans and tokenises text using NLTK (and spaCy if available).
+
+Steps:
+  1. clean(text)         → removes URLs, HTML, special chars, extra spaces
+  2. get_sentences(text) → splits text into individual sentences
+                           Uses spaCy if available, else NLTK, else "." split
+  3. tokenize(sentence)  → splits into words, removes stopwords, lemmatises
+  4. preprocess_paper()  → convenience: adds 'sentences' key to paper dict
+
+Key NLTK tools used:
+  - sent_tokenize    → splits paragraph into sentences
+  - word_tokenize    → splits sentence into words
+  - stopwords        → list of common words to remove ("the", "is", "a" ...)
+  - WordNetLemmatizer → reduces words to root form ("running" → "run")
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  nlp/classifier.py                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+The Sentence Classifier assigns one of 4 labels to each sentence.
+
+Labels:
+  - Claim      → Bold statements, hypotheses, novelty claims
+  - Method     → How the experiment was done, algorithms used
+  - Result     → Outcomes, accuracy scores, performance metrics
+  - Limitation → Problems, gaps, future work, constraints
+
+Three classification modes:
+  1. keyword (default) → Counts keyword matches for each category.
+                         Fast, no GPU needed, always works.
+                         
+  2. transformer       → Uses sentence-transformers to compute semantic
+                         similarity against prototype sentences.
+                         More accurate but requires the model download.
+                         
+  3. hybrid            → Uses keyword first. If scores are tied, uses
+                         transformer as a tiebreaker. Best of both.
+
+evaluate() method:
+  - Accepts a labelled list [(sentence, true_label), ...]
+  - Returns accuracy, precision, recall, F1 using sklearn metrics
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  agents/defender_agent.py                                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+The Defender Agent generates supporting arguments for the paper.
+It simulates a reviewer who wants to ACCEPT the paper.
+
+What it does:
+  - Picks top-N Claim, Method, and Result sentences (by confidence)
+  - Wraps them in positive argument templates:
+      "✅ Original Contribution: {sentence}"
+      "✅ Sound Methodology: {sentence}"
+      "✅ Strong Empirical Evidence: {sentence}"
+  - Generates an overall_stance summary
+
+Output dict keys:
+  agent, paper_title, arguments, key_sentences, overall_stance
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  agents/critic_agent.py                                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+The Critic Agent generates challenging arguments against the paper.
+It simulates a reviewer who wants to REJECT or REVISE the paper.
+
+What it does:
+  - Picks top-N Limitation sentences
+  - Identifies low-confidence claims/methods (vague or unsupported)
+  - Detects missing sections (no Results? No Limitations?)
+  - Wraps findings in negative argument templates:
+      "❌ Acknowledged Limitation: {sentence}"
+      "⚠️ Unsupported / Vague Claim: {sentence}"
+      "❌ Missing Section — No quantitative results reported"
+
+Output dict keys:
+  agent, paper_title, criticisms, key_limitations, missing_sections, overall_stance
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  agents/judge_agent.py                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+The Judge Agent produces the final balanced verdict.
+
+Scoring system:
+  strength_score   = min(n_strengths × 0.8, 5.0)
+  weakness_penalty = min(n_weaknesses × 0.5, 3.0)
+  limitation_penalty = min(n_limitations × 0.3, 1.5)
+  missing_penalty  = min(n_missing × 0.5, 2.0)
+  
+  Also factors in claim/method/result sub-scores from sentence confidence.
+  
+  Final score = weighted combination, clamped to 0–10.
+
+Verdict thresholds:
+  8–10  → ✅ Accept
+  5–7   → 🔄 Minor Revision
+  3–4   → ⚠️ Major Revision
+  0–2   → ❌ Reject
+
+Output dict keys:
+  agent, paper_title, score, verdict, summary, strengths, weaknesses,
+  recommendation, breakdown
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  agents/controller.py                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+The Controller is the orchestrator — it calls all agents in the correct order.
+
+run(query) method:
+  1. ResearchAgent.fetch_papers(query)    → get list of paper dicts
+  2. Preprocessor.preprocess_paper(paper) → clean + split into sentences
+  3. SentenceClassifier.classify_sentences() → label each sentence
+  4. DefenderAgent.defend(paper, classified) → generate strengths
+  5. CriticAgent.critique(paper, classified) → generate weaknesses
+  6. JudgeAgent.judge(paper, defence, critique, classified) → final verdict
+  7. Save session log to data/session_log.json
+
+Returns a list of "debate result" dicts, one per paper.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  utils/helpers.py                                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+Shared utility functions used by multiple modules.
+
+Functions:
+  save_session(query, results)   → saves results to JSON log file
+  load_session(path)             → loads existing session history
+  format_paper_meta(paper)       → truncates abstract, formats author list
+  score_to_color(score)          → maps 0–10 score to hex color (green/yellow/red)
+  verdict_emoji(verdict)         → returns emoji matching verdict string
+  compute_summary_stats(results) → computes avg/max/min score, label counts, verdicts
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  app.py — Streamlit UI                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+The user-facing web interface. Run with: streamlit run app.py
+
+UI layout:
+  Sidebar:
+    - Text input for research query
+    - Slider: max papers (1–10)
+    - Dropdown: classifier mode (keyword/hybrid/transformer)
+    - "Analyse Papers" button
+    - Live session stats
+
+  Main area — 5 tabs:
+  
+  Tab 1 — 📚 Papers:
+    Card-style display for each fetched paper.
+    Shows: title, authors, source tag, year, abstract (truncated), score badge, URL link.
+    
+  Tab 2 — 🏷️ NLP Classification:
+    Sentence-by-sentence breakdown of what label was assigned.
+    Category count metrics (Claims: X, Methods: Y, Results: Z, Limitations: W)
+    Filter by category checkboxes.
+    Plotly bar chart of category distribution.
+    
+  Tab 3 — ⚖️ Debate & Verdict:
+    For each paper: expandable panel showing:
+      - Score banner with colour coding
+      - Sub-scores: Claim/Method/Result/10
+      - Two columns: Defender strengths | Critic weaknesses
+      - Judge balanced summary paragraph
+      - Recommendation text
+      
+  Tab 4 — 📊 Dashboard:
+    - KPI row: papers analysed, avg score, max, min
+    - Bar chart: score per paper
+    - Pie chart: sentence labels across all papers
+    - Verdict distribution chart
+
+  Tab 5 — 📜 History:
+    - Shows last 10 queries from session_log.json
+    - Displays verdicts + scores for each past query
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 5. HOW TO RUN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step 1: Navigate to the project folder
+  cd "AI Automated Reasearch Assistant"
+
+Step 2: Install all dependencies
+  pip install -r requirements.txt
+
+Step 3: Download NLTK data (first time only)
+  python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
+
+Step 4: (Optional) Download spaCy English model for better sentence splitting
+  python -m spacy download en_core_web_sm
+
+Step 5: Launch the Streamlit app
+  streamlit run app.py
+
+Step 6: Open browser at http://localhost:8501
+  - Type a research query (e.g. "BERT language model")
+  - Click "Analyse Papers"
+  - Explore all 5 tabs
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 6. CORE FUNCTIONAL FLOW (STEP BY STEP)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  User types query: "attention mechanism in transformers"
+        │
+        ▼
+  [1] Research Agent
+      → Sends GET request to arXiv API with the query
+      → Sends GET request to Semantic Scholar API
+      → Parses XML (arXiv) and JSON (Semantic Scholar)
+      → Removes duplicate papers by title comparison
+      → Returns: list of paper dicts (title, authors, abstract, year, source, url)
+        │
+        ▼
+  [2] Preprocessor (per paper)
+      → clean(abstract)      → removes URLs, HTML, special characters
+      → get_sentences()      → splits into ["Sentence 1.", "Sentence 2.", ...]
+      → tokenize(sentence)   → ["attention", "mechanism", "learn", "represent"]
+      → adds 'sentences' and 'all_tokens' to paper dict
+        │
+        ▼
+  [3] Sentence Classifier (per sentence)
+      → For each sentence, count keyword matches in 4 category banks
+      → Assign the category with highest match count
+      → Return: [{"sentence": "...", "label": "Method", "confidence": 0.67}, ...]
+        │
+        ▼
+  [4] Defender Agent
+      → Takes all sentences labelled Claim, Method, Result
+      → Sorts by confidence, picks top-N of each
+      → Wraps in supporting templates → list of strength arguments
+      → Writes overall_stance paragraph
+        │
+        ▼
+  [5] Critic Agent
+      → Takes all Limitation sentences
+      → Identifies low-confidence Claims and Methods (vague = suspicious)
+      → Checks for missing categories (no Results? That's a weakness)
+      → Wraps in critical templates → list of weakness arguments
+      → Writes overall_stance paragraph
+        │
+        ▼
+  [6] Judge Agent
+      → Reads n_strengths from Defender output
+      → Reads n_weaknesses, n_limitations, n_missing from Critic output
+      → Computes category sub-scores from sentence confidence averages
+      → Calculates weighted overall score (clamped 0–10)
+      → Maps score to verdict: Accept / Minor Revision / Major Revision / Reject
+      → Writes balanced summary paragraph and recommendation
+        │
+        ▼
+  [7] Controller saves session log → data/session_log.json
+
+  [8] Streamlit UI displays results across 5 tabs
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 7. AGENT ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                    ┌─────────────────────────────────┐
+                    │         CONTROLLER               │
+                    │  (Orchestrates all agents)       │
+                    └──────────────┬──────────────────┘
+                                   │
+              ┌────────────────────┼────────────────────┐
+              │                    │                    │
+              ▼                    ▼                    ▼
+    ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+    │ Research Agent  │  │ NLP Preprocessor│  │  Classifier     │
+    │ (Fetch papers)  │  │ (Clean + split) │  │  (Label sents)  │
+    └────────┬────────┘  └────────┬────────┘  └────────┬────────┘
+             │                    │                    │
+             └────────────────────┴────────────────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    │                             │
+                    ▼                             ▼
+         ┌─────────────────┐         ┌─────────────────┐
+         │  Defender Agent │         │   Critic Agent  │
+         │  (Find strengths│         │  (Find weaknesses│
+         │   pro paper)    │         │   anti paper)   │
+         └────────┬────────┘         └────────┬────────┘
+                  │                           │
+                  └─────────────┬─────────────┘
+                                ▼
+                     ┌─────────────────┐
+                     │   Judge Agent   │
+                     │  (Score 0–10,   │
+                     │   Final Verdict)│
+                     └─────────────────┘
+
+Each agent is:
+  - Completely independent (no cross-imports between agents)
+  - A simple Python class with one main public method
+  - Orchestrated only by the Controller
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 8. NLP PIPELINE DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Input:  Raw abstract text (string)
+Output: List of cleaned, tokenised sentences
+
+Step 1 — Text Cleaning (preprocessor.clean)
+  What happens:
+    - "Check out http://arxiv.org/123" → "Check out"    (URL removed)
+    - "<b>Bold</b> text"               → "Bold text"    (HTML removed)
+    - "Reference [1] shows that"       → "Reference shows that"  ([refs] removed)
+    - "Hello   World\n\n"              → "Hello World"  (whitespace collapsed)
+  
+  Why: Raw API text often has noise that confuses the classifier.
+
+Step 2 — Sentence Splitting (preprocessor.get_sentences)
+  Priority order:
+    1. spaCy EN model (best boundary detection, handles abbreviations)
+    2. NLTK sent_tokenize (good, handles "Dr. Smith went...")
+    3. Simple period split (fallback, less accurate)
+  
+  Filter: Sentences shorter than MIN_SENTENCE_LENGTH (10 chars) are dropped.
+
+Step 3 — Word Tokenisation (preprocessor.tokenize)
+  Steps:
+    a. Lowercase the sentence
+    b. word_tokenize → split on whitespace and punctuation
+    c. Remove stopwords (NLTK English list: ~179 words like "the", "is", "a")
+    d. Lemmatise → "running"→"run", "better"→"good", "studies"→"study"
+    e. Keep only alphabetic tokens of length >= 2
+
+Example:
+  Input:  "We propose a novel attention-based transformer model."
+  After:  ["propos", "novel", "attention", "base", "transform", "model"]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 9. SENTENCE CLASSIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The classifier assigns each sentence one of four labels:
+
+CLAIM keywords sample:
+  "we propose", "novel", "state-of-the-art", "we introduce", "this paper",
+  "outperform", "new approach", "our model", "we argue", "hypothesis"
+
+METHOD keywords sample:
+  "we use", "we train", "algorithm", "neural network", "dataset", "trained on",
+  "evaluated on", "architecture", "encoder", "decoder", "fine-tun", "pipeline"
+
+RESULT keywords sample:
+  "accuracy", "f1", "outperforms", "achieves", "benchmark", "%", "error rate",
+  "score", "precision", "recall", "gain", "improvement", "state of the art"
+
+LIMITATION keywords sample:
+  "limitation", "however", "although", "future work", "fail to", "cannot",
+  "does not", "challenge", "drawback", "assumption", "lack", "insufficient"
+
+Scoring:
+  score[category] = number of matching keywords in sentence
+  label = argmax(scores)
+  confidence = score[label] / sum(all scores)
+
+If no keywords match at all:
+  label = "Claim" with confidence = 0.25 (equal uncertainty)
+
+Evaluation (sklearn):
+  Given a list of (sentence, true_label) pairs:
+  → Returns accuracy, weighted precision, recall, F1
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 10. MULTI-AGENT DEBATE LOGIC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The "debate" in the system works like this:
+
+  DEFENDER says:
+    "Here are 3–5 strong Claims, Methods, and Results from this paper."
+    "This means the paper has original ideas, sound methodology, and good results."
+
+  CRITIC says:
+    "Here are the acknowledged Limitations."
+    "These Claims are vague or unsupported (low confidence)."
+    "Important sections are missing entirely from the abstract."
+
+  JUDGE weighs both sides:
+    "Defender found 7 strengths → +5.6 points"
+    "Critic found 3 weaknesses → -1.5 points"
+    "2 missing sections → -1.0 point"
+    "Claim sub-score = 6.5/10"
+    "Method sub-score = 7.2/10"
+    "Result sub-score = 8.1/10"
+    "Final = 5.6 - 1.5 - 1.0 + weighted(6.5+7.2+8.1) = 7.4/10 → Minor Revision"
+
+This simulates a real 3-person academic review panel.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 11. SCORING & VERDICT SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Score Formula:
+  raw_score = (claim_score × 0.25)
+            + (method_score × 0.25)
+            + (result_score × 0.30)
+            + strength_score           [up to +5]
+            - weakness_penalty         [up to -3]
+            - limitation_penalty       [up to -1.5]
+            - missing_penalty          [up to -2]
+  
+  final_score = clamp(raw_score, 0, 10)
+
+Sub-score explanation:
+  claim_score   = mean confidence of Claim sentences × 10
+  method_score  = mean confidence of Method sentences × 10
+  result_score  = mean confidence of Result sentences × 10
+  (So a paper with all high-confidence Results gets a high result_score)
+
+Verdict thresholds:
+  Score 8–10  → ✅ Accept
+  Score 5–7   → 🔄 Minor Revision
+  Score 3–4   → ⚠️ Major Revision
+  Score 0–2   → ❌ Reject
+
+Color coding in UI:
+  Green  (#28a745) → Accept (8+)
+  Yellow (#ffc107) → Minor Revision (5–7)
+  Orange (#fd7e14) → Major Revision (3–4)
+  Red    (#dc3545) → Reject (0–2)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 12. STREAMLIT UI DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Design:
+  - Dark gradient background (purple-blue: #0f0c29 → #302b63 → #24243e)
+  - Google Font: Inter
+  - Glassmorphism cards (semi-transparent with backdrop blur)
+  - Smooth hover animations on paper cards
+  - Colour-coded score badges and verdict banners
+  - Responsive layout with columns
+
+Sidebar interactions:
+  - Text input → sets the query
+  - Slider (1–10) → controls number of papers to analyse
+  - Selectbox → switches classifier mode (keyword / hybrid / transformer)
+  - "Analyse Papers" button → triggers the full pipeline
+
+Progress feedback:
+  - st.spinner while agents initialise
+  - st.progress bar updates per paper (0% → 100%)
+  - st.success on completion
+
+Session state:
+  - st.session_state.results → stores current analysis results
+  - st.session_state.controller → caches the Controller to avoid re-init
+  - Changes in classifier_mode → automatically reinitialises Controller
+
+Tab 2 extra features:
+  - Paper selector dropdown to view one paper at a time
+  - Category filter multiselect (show only Claims, only Limitations, etc.)
+  - Plotly bar chart of sentence label distribution
+
+Tab 4 dashboard:
+  - 4 KPI metrics at top (total, avg, max, min score)
+  - Plotly bar chart: score per paper
+  - Plotly donut chart: sentence categories across all papers
+  - Plotly bar chart: verdict distribution
+
+Tab 5 history:
+  - Loads data/session_log.json
+  - Shows last 10 sessions in expandable sections
+  - Each session shows verdicts and scores for all papers in that query
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 13. DATA SOURCES (APIs)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+arXiv API:
+  URL:       http://export.arxiv.org/api/query
+  Format:    Atom XML
+  Auth:      None (completely free, no key needed)
+  Params:    search_query, max_results, sortBy, sortOrder
+  Source:    Contains preprints in CS, Physics, Math, Biology, etc.
+  Limits:    ~3 requests/second (be polite)
+
+Semantic Scholar API:
+  URL:       https://api.semanticscholar.org/graph/v1/paper/search
+  Format:    JSON REST API
+  Auth:      No key needed for free tier (basic rate limits apply)
+  Fields:    title, authors, abstract, year, externalIds, openAccessPdf
+  Source:    180M+ academic papers from multiple disciplines
+  Limits:    100 requests / 5 minutes (free tier without API key)
+
+Both APIs are:
+  - Free to use for research/educational purposes
+  - Queried with the requests library
+  - Results normalised into the same paper dict format before processing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 14. CONFIGURATION (config.py)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Variable                     Default   Description
+───────────────────────────  ────────  ──────────────────────────────────────
+MAX_RESULTS_PER_SOURCE       5         Papers fetched per API source
+REQUEST_TIMEOUT              15        Seconds before API request times out
+SENTENCE_CATEGORIES          [4 cats]  Labels used by the classifier
+MIN_SENTENCE_LENGTH          10        Minimum chars for a sentence to count
+DEFENDER_TOP_N               5         Top sentences Defender focuses on
+CRITIC_TOP_N                 5         Top sentences Critic focuses on
+JUDGE_TOP_N                  3         Top arguments shown in Judge output
+SENTENCE_TRANSFORMER_MODEL   MiniLM    HuggingFace model for transformer mode
+APP_TITLE                    (name)    Streamlit page title
+MAX_ABSTRACT_DISPLAY_CHARS   600       Abstract truncation in UI
+DATA_DIR                     "data"    Where session logs are saved
+LOG_FILE                     (path)    JSON log file path
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 15. VIVA DEFENCE TIPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Q: "What is a multi-agent system?"
+A: "A system where multiple specialised agents work together to solve a problem
+   that would be too complex for a single agent. Each agent has one job.
+   Like a real company — Research, Defender, Critic, Judge are departments."
+
+Q: "Why did you use arXiv and Semantic Scholar?"
+A: "Both are free, reliable, and have well-documented APIs. arXiv is the go-to
+   source for CS and AI preprints. Semantic Scholar covers a broader range.
+   Using two sources makes the system more robust."
+
+Q: "How does the sentence classifier work?"
+A: "It uses a keyword-matching approach. We have a list of keywords for each
+   category (Claim, Method, Result, Limitation). For each sentence, we count
+   how many keywords from each list appear. The category with the highest count
+   wins. Confidence = count / total matches."
+
+Q: "What is lemmatisation?"
+A: "Converting a word to its root form. 'Running'→'run', 'studies'→'study'.
+   This helps the classifier match 'proposed' and 'proposing' to the same
+   keyword 'propose'."
+
+Q: "Why use a Judge agent instead of just averaging Defender and Critic?"
+A: "A simple average doesn't capture the relative importance of each argument.
+   The Judge uses a weighted formula that rewards having quantifiable results
+   and penalises missing sections more heavily than weak claims. It also
+   produces a human-readable recommendation, not just a number."
+
+Q: "What is the scoring formula?"
+A: "The score combines: category sub-scores (from sentence confidence averages),
+   a strength bonus from the Defender, and penalties from the Critic for
+   weaknesses, limitations, and missing sections. Everything is weighted and
+   clamped to 0–10."
+
+Q: "What does the Critic agent do exactly?"
+A: "It finds three types of problems:
+   1. Explicit limitations — sentences the paper itself admits are problems
+   2. Low-confidence claims — statements that lack keyword support (vague)
+   3. Missing sections — entire categories not present in the abstract"
+
+Q: "How is this better than ChatGPT summarisation?"
+A: "Summarisation just rephrases what's there. Our system EVALUATES it.
+   We assign a score, identify specific weaknesses, compare both sides of an
+   argument, and give a verdict — just like a real academic peer review."
+
+Q: "Can the system be extended?"
+A: "Yes, easily:
+   - Add more APIs (PubMed, Google Scholar scraping)
+   - Train a custom BERT classifier instead of keyword rules
+   - Add a citation network agent that checks how often a paper is cited
+   - Add a plagiarism detection module"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 16. CHANGELOG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2026-03-27  v1.0.0  Initial complete build
+  - Created project structure (agents/, nlp/, utils/, data/, models/)
+  - config.py: all project-wide settings
+  - requirements.txt: all dependencies
+  - agents/research_agent.py: arXiv + Semantic Scholar paper fetcher
+  - nlp/preprocessor.py: text cleaning, sentence splitting, tokenisation
+  - nlp/classifier.py: keyword + transformer sentence classifier + sklearn eval
+  - agents/defender_agent.py: strength-finding agent
+  - agents/critic_agent.py: weakness-finding agent
+  - agents/judge_agent.py: scoring + verdict synthesis agent
+  - agents/controller.py: full pipeline orchestrator + session logging
+  - utils/helpers.py: session I/O, formatting, colour mapping, stats
+  - app.py: 5-tab Streamlit UI with charts
+  - PROJECT_OVERVIEW.txt: this file
+
+================================================================================
+  END OF PROJECT OVERVIEW
+================================================================================
